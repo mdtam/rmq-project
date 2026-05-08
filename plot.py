@@ -8,6 +8,11 @@ os.makedirs("plots", exist_ok=True)
 
 df = pd.read_csv("data.csv")
 
+# Verify all methods produce the same checksum for each n
+checksums = df.pivot(index="n", columns="name", values="sum")
+assert (checksums.eq(checksums.iloc[:, 0], axis=0).all(axis=None)), \
+    f"Checksum mismatch:\n{checksums}"
+
 plt.rcParams["axes.grid"] = True
 
 names = sorted(df["name"].unique())
