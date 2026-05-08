@@ -30,6 +30,11 @@ build-go:
     cd rmq-go && go build -o rmq-go .
     cp rmq-go/rmq-go rmq
 
+build-kotlin:
+    kotlinc rmq-kotlin/Rmq.kt -include-runtime -d rmq-kotlin/rmq-kotlin.jar
+    printf '#!/usr/bin/env sh\nexec java -jar "$(dirname "$0")/rmq-kotlin/rmq-kotlin.jar" "$@"\n' > rmq
+    chmod +x rmq
+
 run:
     ./rmq input > data.csv
 

@@ -2,4 +2,5 @@
 /rmq
 /rmq-java/build/
 /rmq-go/rmq-go
+/rmq-kotlin/rmq-kotlin.jar
 /rmq-csharp/*.exe

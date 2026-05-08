@@ -1,4 +1,4 @@
-.PHONY: all generate_input build build-rust build-cpp build-java build-csharp build-go run plot open-plots latex latex-debug
+.PHONY: all generate_input build build-rust build-cpp build-java build-csharp build-go build-kotlin run plot open-plots latex latex-debug
 
 all: build run plot open-plots
 
@@ -30,6 +30,11 @@ build-csharp:
 build-go:
 	cd rmq-go && go build -o rmq-go .
 	cp rmq-go/rmq-go rmq
+
+build-kotlin:
+	kotlinc rmq-kotlin/Rmq.kt -include-runtime -d rmq-kotlin/rmq-kotlin.jar
+	printf '#!/usr/bin/env sh\nexec java -jar "$(dirname "$$0")/rmq-kotlin/rmq-kotlin.jar" "$$@"\n' > rmq
+	chmod +x rmq
 
 run:
 	./rmq input > data.csv
