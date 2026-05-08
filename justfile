@@ -15,6 +15,12 @@ build-rust:
 build-cpp:
 	g++ -std=c++17 -O3 -march=native rmq-cpp/*.cpp -o rmq
 
+build-java:
+    mkdir -p rmq-java/build
+    javac -d rmq-java/build rmq-java/Rmq.java
+    printf '#!/usr/bin/env sh\nexec java -cp "$(dirname "$0")/rmq-java/build" Main "$@"\n' > rmq
+    chmod +x rmq
+
 run:
     ./rmq input > data.csv
 
