@@ -12,6 +12,9 @@ build-rust:
     cd rmq-rust && cargo build --release
     cp rmq-rust/target/release/rmq-rust rmq
 
+build-cpp:
+	g++ -std=c++17 -O3 -march=native rmq-cpp/*.cpp -o rmq
+
 run:
     ./rmq input > data.csv
 

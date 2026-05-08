@@ -1,4 +1,4 @@
-.PHONY: all generate_input build build-rust run plot open-plots latex latex-debug
+.PHONY: all generate_input build build-rust build-cpp run plot open-plots latex latex-debug
 
 all: build run plot open-plots
 
@@ -13,6 +13,9 @@ build: build-rust
 build-rust:
 	cd rmq-rust && cargo build --release
 	cp rmq-rust/target/release/rmq-rust rmq
+
+build-cpp:
+	g++ -std=c++17 -O3 -march=native rmq-cpp/*.cpp -o rmq
 
 run:
 	./rmq input > data.csv
