@@ -1,3 +1,4 @@
 /input/
 /rmq
 /rmq-java/build/
+/rmq-csharp/*.exe

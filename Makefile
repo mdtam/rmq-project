@@ -1,4 +1,4 @@
-.PHONY: all generate_input build build-rust build-cpp build-java run plot open-plots latex latex-debug
+.PHONY: all generate_input build build-rust build-cpp build-java build-csharp run plot open-plots latex latex-debug
 
 all: build run plot open-plots
 
@@ -20,6 +20,11 @@ build-cpp:
 build-java:
 	javac -d rmq-java/build rmq-java/Rmq.java
 	printf '#!/usr/bin/env sh\nexec java -cp "$(dirname "$$0")/rmq-java/build" Main "$$@"\n' > rmq
+	chmod +x rmq
+
+build-csharp:
+	mcs -optimize+ -out:rmq-csharp/rmq-csharp.exe rmq-csharp/Program.cs
+	printf '#!/usr/bin/env sh\nexec mono "$(dirname "$$0")/rmq-csharp/rmq-csharp.exe" "$$@"\n' > rmq
 	chmod +x rmq
 
 run:

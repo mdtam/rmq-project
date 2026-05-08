@@ -21,6 +21,11 @@ build-java:
     printf '#!/usr/bin/env sh\nexec java -cp "$(dirname "$0")/rmq-java/build" Main "$@"\n' > rmq
     chmod +x rmq
 
+build-csharp:
+    mcs -optimize+ -out:rmq-csharp/rmq-csharp.exe rmq-csharp/Program.cs
+    printf '#!/usr/bin/env sh\nexec mono "$(dirname "$0")/rmq-csharp/rmq-csharp.exe" "$@"\n' > rmq
+    chmod +x rmq
+
 run:
     ./rmq input > data.csv
 
