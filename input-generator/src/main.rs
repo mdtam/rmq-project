@@ -30,7 +30,8 @@ impl Args {
             let mut a = vec![0u64; n];
             rng.fill(&mut a);
             for a in a {
-                writeln!(file, "{a}").unwrap();
+                // make sure numbers fit in an i64.
+                writeln!(file, "{}", a >> 1).unwrap();
             }
             let mut l = vec![0u64; q];
             let mut r = vec![0u64; q];
