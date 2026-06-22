@@ -21,7 +21,7 @@ struct Naive
 {
 	static std::string name() { return "QuadraticQuery"; }
 	// NOTE: Improved implementations should simply return size_t::MAX.
-	static size_t max_n() { return 100'000; }
+	static size_t max_n() { return 30'000; }
 
 	const std::vector<uint64_t> *data;
 
@@ -74,6 +74,37 @@ struct SegTree
 			r = (r - 1) >> 1;
 		}
 		return mn;
+	}
+};
+
+struct PreComputeAllAnswers
+{
+	static std::string name() { return "PreCompute Answers"; }
+	static size_t max_n() { return 10'000; }
+
+	const std::vector<uint64_t> *data;
+	const std::vector<std::vector<uint64_t>> ans;
+
+	static PreComputeAllAnswers build(const std::vector<uint64_t> &data)
+	{
+		size_t sz = data.size();
+		std::vector<std::vector<uint64_t>> ans(sz, std::vector<uint64_t>(sz));
+		for (size_t i = 0; i < sz; i++)
+		{
+			ans[i][i] = data[i];
+			for (size_t j = i + 1; j < sz; j++)
+			{
+				ans[i][j] = std::min(data[j], ans[i][j - 1]);
+			}
+		}
+		return {&data, ans};
+	}
+
+	size_t space() const { return sizeof(*this) + (ans.size() * ans[0].size() * sizeof(uint64_t)); }
+
+	uint64_t query(size_t l, size_t r) const
+	{
+		return ans[l][r];
 	}
 };
 
@@ -169,9 +200,9 @@ int main(int argc, char *argv[])
 
 	for (const auto &input : inputs)
 	{
-		// bench<Naive>(input);
+		bench<Naive>(input);
 		bench<SegTree>(input);
-		// TODO: Add other implementations here.
+		bench<PreComputeAllAnswers>(input);
 	}
 
 	return 0;
