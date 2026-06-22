@@ -52,12 +52,33 @@ struct SegTree
 	{
 		size_t sz = data.size();
 		std::vector<uint64_t> segtree(sz);
-		for (size_t i = sz - 1; i > 0; i--)
+		// std::vector<uint64_t> segtree2(sz);
+		// for (size_t i = sz - 1; i > 0; i--)
+		// {
+		// 	uint64_t a = (i << 1) >= sz ? data[(i << 1) - sz] : segtree2[(i << 1)];
+		// 	uint64_t b = ((i << 1) | 1) >= sz ? data[((i << 1) | 1) - sz] : segtree2[(i << 1) | 1];
+		// 	segtree2[i] = std::min(a, b);
+		// }
+
+		for (size_t i = sz - 1; i > (sz >> 1); i--)
 		{
-			uint64_t a = (i << 1) >= sz ? data[(i << 1) - sz] : segtree[(i << 1)];
-			uint64_t b = ((i << 1) | 1) >= sz ? data[((i << 1) | 1) - sz] : segtree[(i << 1) | 1];
-			segtree[i] = std::min(a, b);
+			segtree[i] = std::min(data[(i << 1) - sz], data[((i << 1) | 1) - sz]);
 		}
+
+		if (sz & 1)
+		{
+			segtree[sz >> 1] = std::min(segtree[sz - 1], data[0]);
+		}
+		else
+		{
+			segtree[sz >> 1] = std::min(data[0], data[1]);
+		}
+
+		for (size_t i = (sz >> 1) - 1; i > 0; i--)
+		{
+			segtree[i] = std::min(segtree[(i << 1)], segtree[(i << 1) | 1]);
+		}
+
 		return {&data, segtree};
 	}
 
