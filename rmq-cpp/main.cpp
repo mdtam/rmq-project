@@ -8,6 +8,7 @@
 #include <string>
 #include <vector>
 #include <set>
+#include <cmath>
 
 // RMQ interface (duck-typed via templates):
 //
@@ -280,6 +281,116 @@ struct SparseTable
 	}
 };
 
+struct SqrtBlocks
+{
+	static std::string name() { return "Sqrt Blocks"; }
+	static size_t max_n() { return 300000; }
+
+	const std::vector<uint64_t> *data;
+	const std::vector<uint64_t> blocks;
+
+	static SqrtBlocks build(const std::vector<uint64_t> &data)
+	{
+		size_t sz = data.size();
+		size_t sq = std::sqrt(sz);
+		std::vector<uint64_t> blocks((sz / sq) + 1, -1);
+		for (size_t i = 0; i < sz; i++)
+		{
+			blocks[i / sq] = std::min(blocks[i / sq], data[i]);
+		}
+		return {&data, blocks};
+	}
+
+	size_t space() const { return sizeof(*this) + (blocks.size() * sizeof(uint64_t)); }
+
+	uint64_t query(size_t l, size_t r) const
+	{
+		size_t sz = (*data).size();
+		size_t sq = std::sqrt(sz);
+		size_t cur = l;
+
+		uint64_t mn = (*data)[l];
+		while (cur / sq == l / sq && cur <= r)
+		{
+			mn = std::min(mn, (*data)[cur]);
+			cur++;
+		}
+		while (cur + sq <= r)
+		{
+			mn = std::min(mn, blocks[cur / sq]);
+			cur += sq;
+		}
+		while (cur / sq == r / sq && cur <= r)
+		{
+			mn = std::min(mn, (*data)[cur]);
+			cur++;
+		}
+		return mn;
+	}
+};
+
+struct SqrtBlocksPrefix
+{
+	static std::string name() { return "Sqrt Blocks (prefix)"; }
+	static size_t max_n() { return -1; }
+
+	const std::vector<uint64_t> *data;
+	const std::vector<uint64_t> blocks;
+	const std::vector<uint64_t> pre;
+	const std::vector<uint64_t> suf;
+
+	static SqrtBlocksPrefix build(const std::vector<uint64_t> &data)
+	{
+		size_t sz = data.size();
+		size_t sq = std::sqrt(sz);
+		std::vector<uint64_t> blocks((sz / sq) + 1, -1);
+		std::vector<uint64_t> pre(sz, -1);
+		std::vector<uint64_t> suf(sz, -1);
+		for (size_t i = 0; i < sz; i++)
+		{
+			blocks[i / sq] = std::min(blocks[i / sq], data[i]);
+			pre[i] = data[i];
+			if (i > 0 && i / sq == (i - 1) / sq)
+			{
+				pre[i] = std::min(pre[i], pre[i - 1]);
+			}
+			size_t ri = sz - i - 1;
+			suf[ri] = data[ri];
+			if (ri < sz - 1 && ri / sq == (ri + 1) / sq)
+			{
+				suf[ri] = std::min(suf[ri], suf[ri + 1]);
+			}
+		}
+		return {&data, blocks, pre, suf};
+	}
+
+	size_t space() const { return sizeof(*this) + ((blocks.size() + pre.size() + suf.size()) * sizeof(uint64_t)); }
+
+	uint64_t query(size_t l, size_t r) const
+	{
+		size_t sz = (*data).size();
+		size_t sq = std::sqrt(sz);
+		uint64_t mn = (l / sq == r / sq) ? (*data)[l] : suf[l];
+		size_t cur = (l / sq == r / sq) ? l : ((l / sq) + 1) * sq;
+		while (cur + sq <= r)
+		{
+			mn = std::min(mn, blocks[cur / sq]);
+			cur += sq;
+		}
+		if (l / sq == r / sq)
+		{
+			while (cur <= r)
+			{
+				mn = std::min(mn, (*data)[cur]);
+				cur++;
+			}
+		}
+		else
+			mn = std::min(mn, pre[r]);
+		return mn;
+	}
+};
+
 // -------------------------------------------------------------
 // TODO: Implement the RMQ interface for additional data structures.
 // -------------------------------------------------------------
@@ -372,11 +483,13 @@ int main(int argc, char *argv[])
 
 	for (const auto &input : inputs)
 	{
-		bench<Naive>(input);
+		// bench<Naive>(input);
 		bench<SegTree>(input);
-		bench<SegTreePointers>(input);
-		bench<PreComputeAllAnswers>(input);
+		// bench<SegTreePointers>(input);
+		// bench<PreComputeAllAnswers>(input);
 		bench<SparseTable>(input);
+		bench<SqrtBlocks>(input);
+		bench<SqrtBlocksPrefix>(input);
 	}
 
 	return 0;
