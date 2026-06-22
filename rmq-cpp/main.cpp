@@ -326,55 +326,56 @@ struct SqrtBlocksPrefix
 	const std::vector<uint64_t> blocks;
 	const std::vector<uint64_t> pre;
 	const std::vector<uint64_t> suf;
+	const size_t sq;
 
 	static SqrtBlocksPrefix build(const std::vector<uint64_t> &data)
 	{
 		size_t sz = data.size();
 		size_t sq = std::sqrt(sz);
-		std::vector<uint64_t> blocks((sz / sq) + 1, -1);
-		std::vector<uint64_t> pre(sz, -1);
-		std::vector<uint64_t> suf(sz, -1);
+		std::vector<uint64_t> blocks((sz + sq - 1) / sq, -1);
+		std::vector<uint64_t> pre(sz);
+		std::vector<uint64_t> suf(sz);
 		for (size_t i = 0; i < sz; i++)
 		{
-			blocks[i / sq] = std::min(blocks[i / sq], data[i]);
-			pre[i] = data[i];
-			if (i > 0 && i / sq == (i - 1) / sq)
-			{
-				pre[i] = std::min(pre[i], pre[i - 1]);
-			}
-			size_t ri = sz - i - 1;
-			suf[ri] = data[ri];
-			if (ri < sz - 1 && ri / sq == (ri + 1) / sq)
-			{
-				suf[ri] = std::min(suf[ri], suf[ri + 1]);
-			}
+			size_t idx = i / sq;
+			blocks[idx] = std::min(blocks[idx], data[i]);
+
+			if (i % sq == 0)
+				pre[i] = data[i];
+			else
+				pre[i] = std::min(data[i], pre[i - 1]);
 		}
-		return {&data, blocks, pre, suf};
+
+		for (int i = sz - 1; i >= 0; i--)
+		{
+			size_t idx = i / sq;
+			if ((i + 1) % sq == 0)
+				suf[i] = data[i];
+			else
+				suf[i] = std::min(data[i], suf[i + 1]);
+		}
+		return {&data, blocks, pre, suf, sq};
 	}
 
 	size_t space() const { return sizeof(*this) + ((blocks.size() + pre.size() + suf.size()) * sizeof(uint64_t)); }
 
 	uint64_t query(size_t l, size_t r) const
 	{
-		size_t sz = (*data).size();
-		size_t sq = std::sqrt(sz);
-		uint64_t mn = (l / sq == r / sq) ? (*data)[l] : suf[l];
-		size_t cur = (l / sq == r / sq) ? l : ((l / sq) + 1) * sq;
-		while (cur + sq <= r)
+		size_t ldx = l / sq, rdx = r / sq;
+		if (ldx == rdx)
 		{
-			mn = std::min(mn, blocks[cur / sq]);
-			cur += sq;
-		}
-		if (l / sq == r / sq)
-		{
-			while (cur <= r)
+			uint64_t mn = (*data)[l];
+			for (size_t i = l + 1; i <= r; i++)
 			{
-				mn = std::min(mn, (*data)[cur]);
-				cur++;
+				mn = std::min(mn, (*data)[i]);
 			}
+			return mn;
 		}
-		else
-			mn = std::min(mn, pre[r]);
+		uint64_t mn = std::min(suf[l], pre[r]);
+		for (size_t i = ldx + 1; i < rdx; i++)
+		{
+			mn = std::min(mn, blocks[i]);
+		}
 		return mn;
 	}
 };
