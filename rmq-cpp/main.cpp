@@ -7,6 +7,7 @@
 #include <iostream>
 #include <string>
 #include <vector>
+#include <set>
 
 // RMQ interface (duck-typed via templates):
 //
@@ -74,6 +75,122 @@ struct SegTree
 			r = (r - 1) >> 1;
 		}
 		return mn;
+	}
+};
+
+struct SegTreeNode
+{
+	SegTreeNode *lft = nullptr;
+	SegTreeNode *rgt = nullptr;
+	SegTreeNode(size_t left, size_t right) { l = left, r = right; }
+	size_t l, r;
+	uint64_t min;
+
+	size_t calculate_space() const
+	{
+		size_t total = sizeof(SegTreeNode);
+		if (lft)
+			total += lft->calculate_space();
+		if (rgt)
+			total += rgt->calculate_space();
+		return total;
+	}
+};
+
+struct SegTreePointers
+{
+	static std::string name() { return "Segment Tree (Pointers)"; }
+	static size_t max_n() { return -1; }
+
+	const std::vector<uint64_t> *data;
+	SegTreeNode *segtree;
+	mutable std::set<size_t> idxs;
+
+	static SegTreePointers build(const std::vector<uint64_t> &data)
+	{
+		std::set<size_t> idxs;
+		for (size_t i = 0; i < data.size(); i++)
+			idxs.insert(i);
+		return {&data, new SegTreeNode(0, data.size() - 1), idxs};
+	}
+
+	size_t space() const
+	{
+		size_t res = sizeof(*this);
+		res += idxs.size() * sizeof(size_t);
+		res += segtree->calculate_space();
+		return res;
+	}
+
+	uint64_t query(size_t l, size_t r, SegTreeNode *node = nullptr) const
+	{
+		if (r - l <= 30)
+		{
+			uint64_t mn = (*data)[l];
+			for (size_t i = l + 1; i <= r; i++)
+			{
+				mn = std::min(mn, (*data)[i]);
+			}
+			return mn;
+		}
+
+		if (node == nullptr)
+		{
+			// new query update idxs
+			auto it = idxs.lower_bound(l);
+			while (it != idxs.end())
+			{
+				if (*it > r)
+					break;
+				update(*it);
+				it = idxs.erase(it);
+			}
+		}
+		SegTreeNode *nod = (node == nullptr) ? segtree : node;
+		if (nod->l >= l && nod->r <= r)
+		{
+			return nod->min;
+		}
+		if (nod->l == nod->r)
+		{
+			return -1;
+		}
+		size_t mid = (nod->l + nod->r) / 2;
+		uint64_t res = (*data)[l];
+		if (l <= mid)
+		{
+			res = std::min(res, query(l, r, nod->lft));
+		}
+		if (r > mid)
+		{
+			res = std::min(res, query(l, r, nod->rgt));
+		}
+		return res;
+	}
+
+	void update(size_t idx, SegTreeNode *node = nullptr) const
+	{
+		SegTreeNode *nod = (node == nullptr) ? segtree : node;
+		if (nod->l == nod->r && nod->l == idx)
+		{
+			nod->min = (*data)[idx];
+			return;
+		}
+		size_t mid = (nod->l + nod->r) / 2;
+		if (idx <= mid)
+		{
+			if (nod->lft == nullptr)
+				nod->lft = new SegTreeNode(nod->l, mid);
+			update(idx, nod->lft);
+			nod->min = (nod->rgt != nullptr) ? std::min(nod->lft->min, nod->rgt->min) : nod->lft->min;
+		}
+		else
+		{
+			if (nod->rgt == nullptr)
+				nod->rgt = new SegTreeNode(mid + 1, nod->r);
+			update(idx, nod->rgt);
+			nod->min = (nod->lft != nullptr) ? std::min(nod->lft->min, nod->rgt->min) : nod->rgt->min;
+		}
 	}
 };
 
@@ -202,6 +319,7 @@ int main(int argc, char *argv[])
 	{
 		bench<Naive>(input);
 		bench<SegTree>(input);
+		bench<SegTreePointers>(input);
 		bench<PreComputeAllAnswers>(input);
 	}
 
