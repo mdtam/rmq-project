@@ -1,4 +1,4 @@
-.PHONY: all generate_input python_env build build-rust build-cpp build-java build-csharp build-go build-kotlin build-haskell run plot open-plots latex latex-debug
+.PHONY: all generate_input python_env build debug build-rust build-cpp debug-cpp build-java build-csharp build-go build-kotlin build-haskell run plot open-plots latex latex-debug
 
 all: build run python_env plot
 
@@ -15,6 +15,7 @@ python_env:
 # TODO: Customize this for your language.
 # Make sure to end with a `rmq` binary in the root directory.
 build: build-cpp
+debug: debug-cpp
 
 # build-rust:
 # 	cd rmq-rust && cargo build --release
@@ -22,6 +23,9 @@ build: build-cpp
 
 build-cpp:
 	g++ -std=c++17 -O3 -march=native rmq-cpp/*.cpp -o rmq
+
+debug-cpp:
+	g++ -std=c++17 -g -O0 -Wall -march=native rmq-cpp/*.cpp -o rmq
 
 # build-java:
 # 	javac -d rmq-java/build rmq-java/Rmq.java
