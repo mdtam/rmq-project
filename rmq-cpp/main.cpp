@@ -225,6 +225,61 @@ struct PreComputeAllAnswers
 	}
 };
 
+struct SparseTable
+{
+	static std::string name() { return "Sparse Table"; }
+	static size_t max_n() { return -1; }
+
+	const std::vector<uint64_t> *data;
+	const std::vector<std::vector<uint64_t>> table;
+
+	static SparseTable build(const std::vector<uint64_t> &data)
+	{
+		size_t sz = data.size();
+		size_t lg = 0;
+		while ((1 << lg) < sz)
+			lg++;
+		std::vector<std::vector<uint64_t>> table(lg, std::vector<uint64_t>(sz));
+		for (size_t i = 0; i < lg; i++)
+		{
+			for (size_t j = 0; j < sz; j++)
+			{
+				if (i)
+				{
+					table[i][j] = table[i - 1][j];
+					if ((j + (1 << (i - 1))) < sz)
+						table[i][j] = std::min(table[i][j], table[i - 1][j + (1 << (i - 1))]);
+				}
+				else
+					table[i][j] = data[j];
+			}
+		}
+		return {&data, table};
+	}
+
+	size_t space() const { return sizeof(*this) + (table.size() * table[0].size() * sizeof(uint64_t)); }
+
+	uint64_t query(size_t l, size_t r) const
+	{
+		size_t cur = l;
+		int lg = 0;
+		uint64_t mn = (*data)[l];
+		while ((1 << lg) <= (r - l + 1))
+			lg++;
+		lg--;
+		while (lg >= 0)
+		{
+			if ((cur + (1 << lg) - 1) <= r)
+			{
+				mn = std::min(mn, table[lg][cur]);
+				cur += (1 << lg);
+			}
+			lg--;
+		}
+		return mn;
+	}
+};
+
 // -------------------------------------------------------------
 // TODO: Implement the RMQ interface for additional data structures.
 // -------------------------------------------------------------
@@ -321,6 +376,7 @@ int main(int argc, char *argv[])
 		bench<SegTree>(input);
 		bench<SegTreePointers>(input);
 		bench<PreComputeAllAnswers>(input);
+		bench<SparseTable>(input);
 	}
 
 	return 0;
