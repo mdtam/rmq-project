@@ -232,52 +232,40 @@ struct SparseTable
 	static size_t max_n() { return -1; }
 
 	const std::vector<uint64_t> *data;
-	const std::vector<std::vector<uint64_t>> table;
+	const std::vector<uint64_t> table;
+	const size_t sz;
+	const size_t lg;
 
 	static SparseTable build(const std::vector<uint64_t> &data)
 	{
 		size_t sz = data.size();
-		size_t lg = 0;
-		while ((1 << lg) < sz)
-			lg++;
-		std::vector<std::vector<uint64_t>> table(lg, std::vector<uint64_t>(sz));
-		for (size_t i = 0; i < lg; i++)
+		size_t lg = 32 - __builtin_clz((unsigned int)sz);
+		std::vector<uint64_t> table(lg * sz);
+		for (size_t j = 0; j < sz; j++)
 		{
-			for (size_t j = 0; j < sz; j++)
+			table[j] = data[j];
+		}
+		for (size_t i = 1; i < lg; i++)
+		{
+			size_t prev_offset = (i - 1) * sz;
+			size_t curr_offset = i * sz;
+			size_t step = (1 << (i - 1));
+
+			for (size_t j = 0; j + step < sz; j++)
 			{
-				if (i)
-				{
-					table[i][j] = table[i - 1][j];
-					if ((j + (1 << (i - 1))) < sz)
-						table[i][j] = std::min(table[i][j], table[i - 1][j + (1 << (i - 1))]);
-				}
-				else
-					table[i][j] = data[j];
+				table[curr_offset + j] = std::min(table[prev_offset + j], table[prev_offset + j + step]);
 			}
 		}
-		return {&data, table};
+		return {&data, table, sz, lg};
 	}
 
-	size_t space() const { return sizeof(*this) + (table.size() * table[0].size() * sizeof(uint64_t)); }
+	size_t space() const { return sizeof(*this) + (table.size() * sizeof(uint64_t)); }
 
 	uint64_t query(size_t l, size_t r) const
 	{
-		size_t cur = l;
-		int lg = 0;
-		uint64_t mn = (*data)[l];
-		while ((1 << lg) <= (r - l + 1))
-			lg++;
-		lg--;
-		while (lg >= 0)
-		{
-			if ((cur + (1 << lg) - 1) <= r)
-			{
-				mn = std::min(mn, table[lg][cur]);
-				cur += (1 << lg);
-			}
-			lg--;
-		}
-		return mn;
+		size_t range = (r - l + 1);
+		size_t k = 31 - __builtin_clz(range);
+		return std::min(table[k * sz + l], table[k * sz + r - (1 << k) + 1]);
 	}
 };
 
