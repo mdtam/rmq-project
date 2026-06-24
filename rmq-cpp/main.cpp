@@ -198,28 +198,28 @@ struct PreComputeAllAnswers
 	static size_t max_n() { return 10'000; }
 
 	const std::vector<uint64_t> *data;
-	const std::vector<std::vector<uint64_t>> ans;
+	const std::vector<uint64_t> ans;
 
 	static PreComputeAllAnswers build(const std::vector<uint64_t> &data)
 	{
 		size_t sz = data.size();
-		std::vector<std::vector<uint64_t>> ans(sz, std::vector<uint64_t>(sz));
+		std::vector<uint64_t> ans(sz * sz);
 		for (size_t i = 0; i < sz; i++)
 		{
-			ans[i][i] = data[i];
+			ans[i * sz + i] = data[i];
 			for (size_t j = i + 1; j < sz; j++)
 			{
-				ans[i][j] = std::min(data[j], ans[i][j - 1]);
+				ans[i * sz + j] = std::min(data[j], ans[i * sz + j - 1]);
 			}
 		}
 		return {&data, ans};
 	}
 
-	size_t space() const { return sizeof(*this) + (ans.size() * ans[0].size() * sizeof(uint64_t)); }
+	size_t space() const { return sizeof(*this) + (ans.size() * sizeof(uint64_t)); }
 
 	uint64_t query(size_t l, size_t r) const
 	{
-		return ans[l][r];
+		return ans[l * (*data).size() + r];
 	}
 };
 
