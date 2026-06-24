@@ -465,6 +465,118 @@ struct MultilevelSqrtBlocks
 	}
 };
 
+struct CartesianTrees
+{
+	static std::string name() { return "Cartesian Tree (LCA)"; }
+	static size_t max_n() { return -1; }
+
+	const std::vector<uint64_t> *data;
+	const std::vector<uint64_t> tour_vals;
+	const std::vector<int> tour_depths;
+	const std::vector<std::vector<int>> st;
+	const std::vector<int> first_occurrence;
+
+	static CartesianTrees build(const std::vector<uint64_t> &data)
+	{
+		size_t sz = data.size();
+
+		std::vector<int> left(sz, -1), right(sz, -1);
+		std::vector<int> s;
+		for (int i = 0; i < sz; i++)
+		{
+			int last = -1;
+			while (!s.empty() && data[s.back()] > data[i])
+			{
+				last = s.back();
+				s.pop_back();
+			}
+			if (!s.empty())
+				right[s.back()] = i;
+			if (last != -1)
+				left[i] = last;
+			s.push_back(i);
+		}
+
+		int root = s.empty() ? -1 : 0;
+		while (!s.empty())
+		{
+			root = s.back();
+			s.pop_back();
+		}
+
+		std::vector<uint64_t> tour_vals;
+		std::vector<int> tour_depths;
+		std::vector<int> first_occ(sz);
+
+		auto dfs = [&](auto self, int u, int d) -> void
+		{
+			if (u == -1)
+				return;
+			first_occ[u] = tour_vals.size();
+			tour_vals.push_back(data[u]);
+			tour_depths.push_back(d);
+
+			if (left[u] != -1)
+			{
+				self(self, left[u], d + 1);
+				tour_vals.push_back(data[u]);
+				tour_depths.push_back(d);
+			}
+			if (right[u] != -1)
+			{
+				self(self, right[u], d + 1);
+				tour_vals.push_back(data[u]);
+				tour_depths.push_back(d);
+			}
+		};
+		dfs(dfs, root, 0);
+
+		int m = tour_depths.size();
+		int lg = 32 - __builtin_clz((unsigned int)m);
+		std::vector<std::vector<int>> st(lg, std::vector<int>(m));
+		for (int i = 0; i < m; i++)
+			st[0][i] = i;
+
+		for (int j = 1; j < lg; j++)
+		{
+			for (int i = 0; i + (1 << j) <= m; i++)
+			{
+				int left = st[j - 1][i];
+				int right = st[j - 1][i + (1 << (j - 1))];
+				st[j][i] = (tour_depths[left] < tour_depths[right]) ? left : right;
+			}
+		}
+
+		return {&data, std::move(tour_vals), std::move(tour_depths), std::move(st), std::move(first_occ)};
+	}
+
+	uint64_t query(size_t l, size_t r) const
+	{
+		int l_idx = first_occurrence[l];
+		int r_idx = first_occurrence[r];
+		if (l_idx > r_idx)
+			std::swap(l_idx, r_idx);
+
+		int len = r_idx - l_idx + 1;
+		int k = 31 - __builtin_clz((unsigned int)len);
+
+		int idx1 = st[k][l_idx];
+		int idx2 = st[k][r_idx - (1 << k) + 1];
+		int lca_idx = (tour_depths[idx1] < tour_depths[idx2]) ? idx1 : idx2;
+
+		return tour_vals[lca_idx];
+	}
+
+	size_t space() const
+	{
+		size_t total = sizeof(*this) + (tour_vals.size() + tour_depths.size()) * sizeof(uint64_t);
+		for (const auto &row : st)
+			total += row.size() * sizeof(int);
+		total += first_occurrence.size() * sizeof(int);
+		return total;
+	}
+};
+
 // -------------------------------------------------------------
 // TODO: Implement the RMQ interface for additional data structures.
 // -------------------------------------------------------------
@@ -565,6 +677,7 @@ int main(int argc, char *argv[])
 		bench<SqrtBlocks>(input);
 		bench<SqrtBlocksPrefix>(input);
 		bench<MultilevelSqrtBlocks>(input);
+		bench<CartesianTrees>(input);
 	}
 
 	return 0;
