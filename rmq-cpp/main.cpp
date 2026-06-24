@@ -126,48 +126,24 @@ struct SegTreePointers
 
 	const std::vector<uint64_t> *data;
 	SegTreeNode *segtree;
-	mutable std::set<size_t> idxs;
 
 	static SegTreePointers build(const std::vector<uint64_t> &data)
 	{
-		std::set<size_t> idxs;
+		SegTreePointers ret = {&data, new SegTreeNode(0, data.size() - 1)};
 		for (size_t i = 0; i < data.size(); i++)
-			idxs.insert(i);
-		return {&data, new SegTreeNode(0, data.size() - 1), idxs};
+			ret.update(i);
+		return ret;
 	}
 
 	size_t space() const
 	{
 		size_t res = sizeof(*this);
-		res += idxs.size() * sizeof(size_t);
 		res += segtree->calculate_space();
 		return res;
 	}
 
 	uint64_t query(size_t l, size_t r, SegTreeNode *node = nullptr) const
 	{
-		if (r - l <= 30)
-		{
-			uint64_t mn = (*data)[l];
-			for (size_t i = l + 1; i <= r; i++)
-			{
-				mn = std::min(mn, (*data)[i]);
-			}
-			return mn;
-		}
-
-		if (node == nullptr)
-		{
-			// new query update idxs
-			auto it = idxs.lower_bound(l);
-			while (it != idxs.end())
-			{
-				if (*it > r)
-					break;
-				update(*it);
-				it = idxs.erase(it);
-			}
-		}
 		SegTreeNode *nod = (node == nullptr) ? segtree : node;
 		if (nod->l >= l && nod->r <= r)
 		{
@@ -293,43 +269,52 @@ struct SparseTable
 struct SqrtBlocks
 {
 	static std::string name() { return "Sqrt Blocks"; }
-	static size_t max_n() { return 300000; }
+	static size_t max_n() { return -1; }
 
 	const std::vector<uint64_t> *data;
 	const std::vector<uint64_t> blocks;
+	const size_t sz, sq;
 
 	static SqrtBlocks build(const std::vector<uint64_t> &data)
 	{
 		size_t sz = data.size();
 		size_t sq = std::sqrt(sz);
-		std::vector<uint64_t> blocks((sz / sq) + 1, -1);
+		std::vector<uint64_t> blocks((sz + sq - 1) / sq, -1);
 		for (size_t i = 0; i < sz; i++)
 		{
-			blocks[i / sq] = std::min(blocks[i / sq], data[i]);
+			size_t idx = i / sq;
+			if (sq * idx == i)
+				blocks[idx] = data[i];
+			else
+				blocks[idx] = std::min(blocks[idx], data[i]);
 		}
-		return {&data, blocks};
+		return {&data, blocks, sz, sq};
 	}
 
 	size_t space() const { return sizeof(*this) + (blocks.size() * sizeof(uint64_t)); }
 
 	uint64_t query(size_t l, size_t r) const
 	{
-		size_t sz = (*data).size();
-		size_t sq = std::sqrt(sz);
+		size_t ldx = l / sq;
 		size_t cur = l;
-
 		uint64_t mn = (*data)[l];
-		while (cur / sq == l / sq && cur <= r)
+
+		if (ldx * sq < l)
 		{
-			mn = std::min(mn, (*data)[cur]);
-			cur++;
+			size_t pre = (ldx + 1) * sq;
+			while (cur < std::min(pre, r))
+			{
+				mn = std::min(mn, (*data)[cur]);
+				cur++;
+			}
+			ldx++;
 		}
-		while (cur + sq <= r)
+		while (cur + sq <= r + 1)
 		{
-			mn = std::min(mn, blocks[cur / sq]);
+			mn = std::min(mn, blocks[ldx++]);
 			cur += sq;
 		}
-		while (cur / sq == r / sq && cur <= r)
+		while (cur <= r)
 		{
 			mn = std::min(mn, (*data)[cur]);
 			cur++;
@@ -348,8 +333,10 @@ struct SqrtBlocksPrefix
 	const std::vector<uint64_t> pre;
 	const std::vector<uint64_t> suf;
 	const size_t sq;
+	const bool save_data;
+	const std::vector<uint64_t> saved_data;
 
-	static SqrtBlocksPrefix build(const std::vector<uint64_t> &data)
+	static SqrtBlocksPrefix build(const std::vector<uint64_t> &data, const bool save_data = false)
 	{
 		size_t sz = data.size();
 		size_t sq = std::sqrt(sz);
@@ -359,26 +346,105 @@ struct SqrtBlocksPrefix
 		for (size_t i = 0; i < sz; i++)
 		{
 			size_t idx = i / sq;
-			blocks[idx] = std::min(blocks[idx], data[i]);
-
-			if (i % sq == 0)
+			if (idx * sq == i)
+			{
+				blocks[idx] = data[i];
 				pre[i] = data[i];
+			}
 			else
+			{
+				blocks[idx] = std::min(blocks[idx], data[i]);
 				pre[i] = std::min(data[i], pre[i - 1]);
+			}
 		}
 
 		for (int i = sz - 1; i >= 0; i--)
 		{
 			size_t idx = i / sq;
-			if ((i + 1) % sq == 0)
+			if (i == sz - 1 || (i - idx * sq) == sq - 1)
 				suf[i] = data[i];
 			else
 				suf[i] = std::min(data[i], suf[i + 1]);
 		}
-		return {&data, blocks, pre, suf, sq};
+		if (save_data)
+			return {&data, blocks, pre, suf, sq, save_data, data};
+		return {&data, blocks, pre, suf, sq, save_data};
 	}
 
-	size_t space() const { return sizeof(*this) + ((blocks.size() + pre.size() + suf.size()) * sizeof(uint64_t)); }
+	size_t space() const
+	{
+		size_t ret = sizeof(*this);
+		ret += ((blocks.size() + pre.size() + suf.size()) * sizeof(uint64_t));
+		ret += save_data ? (saved_data.size() * sizeof(uint64_t)) : 0;
+		return ret;
+	}
+
+	uint64_t query(size_t l, size_t r) const
+	{
+		size_t ldx = l / sq, rdx = r / sq;
+		if (ldx == rdx)
+		{
+			uint64_t mn = save_data ? saved_data[l] : (*data)[l];
+			for (size_t i = l + 1; i <= r; i++)
+			{
+				mn = std::min(mn, save_data ? saved_data[i] : (*data)[i]);
+			}
+			return mn;
+		}
+		uint64_t mn = std::min(suf[l], pre[r]);
+		for (size_t i = ldx + 1; i < rdx; i++)
+		{
+			mn = std::min(mn, blocks[i]);
+		}
+		return mn;
+	}
+};
+
+struct MultilevelSqrtBlocks
+{
+	static std::string name() { return "Multilevel Sqrt Blocks"; }
+	static size_t max_n() { return -1; }
+
+	const std::vector<uint64_t> *data;
+	const std::vector<uint64_t> blocks;
+	const std::vector<uint64_t> pre;
+	const std::vector<uint64_t> suf;
+	const size_t sq;
+	const SqrtBlocksPrefix l2_blocks;
+
+	static MultilevelSqrtBlocks build(const std::vector<uint64_t> &data)
+	{
+		size_t sz = data.size();
+		size_t sq = std::sqrt(std::sqrt(sz));
+		std::vector<uint64_t> blocks((sz + sq - 1) / sq, -1);
+		std::vector<uint64_t> pre(sz), suf(sz);
+		for (size_t i = 0; i < sz; i++)
+		{
+			size_t idx = i / sq;
+			if (idx * sq == i)
+			{
+				blocks[idx] = data[i];
+				pre[i] = data[i];
+			}
+			else
+			{
+				blocks[idx] = std::min(blocks[idx], data[i]);
+				pre[i] = std::min(data[i], pre[i - 1]);
+			}
+		}
+		for (int i = sz - 1; i >= 0; i--)
+		{
+			size_t idx = i / sq;
+			if (i == sz - 1 || (i - idx * sq) == sq - 1)
+				suf[i] = data[i];
+			else
+				suf[i] = std::min(data[i], suf[i + 1]);
+		}
+		SqrtBlocksPrefix l2 = SqrtBlocksPrefix::build(blocks, true);
+		return {&data, blocks, pre, suf, sq, l2};
+	}
+
+	size_t space() const { return sizeof(*this) + ((blocks.size() + pre.size() + suf.size()) * sizeof(uint64_t)) + l2_blocks.space(); }
 
 	uint64_t query(size_t l, size_t r) const
 	{
@@ -393,10 +459,8 @@ struct SqrtBlocksPrefix
 			return mn;
 		}
 		uint64_t mn = std::min(suf[l], pre[r]);
-		for (size_t i = ldx + 1; i < rdx; i++)
-		{
-			mn = std::min(mn, blocks[i]);
-		}
+		if (rdx - ldx > 1)
+			mn = std::min(mn, l2_blocks.query(ldx + 1, rdx - 1));
 		return mn;
 	}
 };
@@ -493,13 +557,14 @@ int main(int argc, char *argv[])
 
 	for (const auto &input : inputs)
 	{
-		// bench<Naive>(input);
+		bench<Naive>(input);
 		bench<SegTree>(input);
-		// bench<SegTreePointers>(input);
-		// bench<PreComputeAllAnswers>(input);
+		bench<SegTreePointers>(input);
+		bench<PreComputeAllAnswers>(input);
 		bench<SparseTable>(input);
 		bench<SqrtBlocks>(input);
 		bench<SqrtBlocksPrefix>(input);
+		bench<MultilevelSqrtBlocks>(input);
 	}
 
 	return 0;
